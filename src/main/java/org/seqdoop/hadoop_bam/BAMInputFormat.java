@@ -23,7 +23,6 @@
 package org.seqdoop.hadoop_bam;
 
 import htsjdk.samtools.BAMFileSpan;
-import htsjdk.samtools.BAMIndex;
 import htsjdk.samtools.Chunk;
 import htsjdk.samtools.DiskBasedBAMFileIndex;
 import htsjdk.samtools.SAMFileHeader;
@@ -31,7 +30,6 @@ import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.samtools.SamFiles;
 import htsjdk.samtools.util.Interval;
 import htsjdk.samtools.util.Locatable;
-import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -85,6 +83,17 @@ public class BAMInputFormat
 	 * programmatic use {@link #setIntervals(Configuration, List)} should be preferred.
 	 */
 	public static final String INTERVALS_PROPERTY = "hadoopbam.bam.intervals";
+
+	/**
+	 * The maximum number of intervals for which splits will be trimmed or filtered. This
+	 * is an optimization setting, since if there are a large number of intervals
+	 * (many thousands) then it is more efficient to use all splits and only perform
+	 * filtering at the read level.
+	 */
+	public static final String MAX_INTERVALS_FOR_SPLIT_FILTERING_PROPERTY =
+			"hadoopbam.bam.max-intervals-for-split-filtering";
+
+	private static final int DEFAULT_MAX_INTERVALS_FOR_SPLIT_FILTERING = 1000;
 
 	public static <T extends Locatable> void setIntervals(Configuration conf,
 			List<T> intervals) {
@@ -289,7 +298,13 @@ public class BAMInputFormat
 	private List<InputSplit> filterByInterval(List<InputSplit> splits, Configuration conf)
 			throws IOException {
 		List<Interval> intervals = getIntervals(conf);
+		int maxIntervalsForSplitFiltering = conf.getInt(MAX_INTERVALS_FOR_SPLIT_FILTERING_PROPERTY,
+				DEFAULT_MAX_INTERVALS_FOR_SPLIT_FILTERING);
 		if (intervals == null) {
+			return splits;
+		} else if (intervals.size() > maxIntervalsForSplitFiltering) {
+			System.err.println("INFO: not filtering splits by intervals since number of " +
+					"intervals is greater than " + maxIntervalsForSplitFiltering);
 			return splits;
 		}
 

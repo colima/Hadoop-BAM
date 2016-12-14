@@ -105,6 +105,26 @@ public class TestBAMInputFormat {
   }
 
   @Test
+  public void testIntervalsWithSplitFilteringDisabled() throws Exception {
+    input = BAMTestUtil.writeBamFile(1000, SAMFileHeader.SortOrder.coordinate)
+        .getAbsolutePath();
+    List<Interval> intervals = new ArrayList<Interval>();
+    intervals.add(new Interval("chr21", 5000, 9999)); // includes two unmapped fragments
+    intervals.add(new Interval("chr21", 20000, 22999));
+
+    completeSetup(false, intervals);
+
+    jobContext.getConfiguration().setInt(FileInputFormat.SPLIT_MAXSIZE, 40000);
+    jobContext.getConfiguration().setInt(BAMInputFormat
+        .MAX_INTERVALS_FOR_SPLIT_FILTERING_PROPERTY, 0);
+    BAMInputFormat inputFormat = new BAMInputFormat();
+    List<InputSplit> splits = inputFormat.getSplits(jobContext);
+    assertEquals(2, splits.size()); // second split is not filtered out
+    List<SAMRecord> split0Records = getSAMRecordsFromSplit(inputFormat, splits.get(0));
+    assertEquals(16, split0Records.size());
+  }
+
+  @Test
   public void testIntervalCoveringWholeChromosome() throws Exception {
     input = BAMTestUtil.writeBamFile(1000, SAMFileHeader.SortOrder.coordinate)
         .getAbsolutePath();
